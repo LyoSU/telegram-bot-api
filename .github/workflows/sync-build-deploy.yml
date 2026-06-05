@@ -83,6 +83,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: docker_build
         with:
           context: .
           platforms: linux/amd64
@@ -90,10 +91,33 @@ jobs:
           tags: |
             ghcr.io/lyosu/telegram-bot-api:latest
             ghcr.io/lyosu/telegram-bot-api:${{ steps.ver.outputs.version }}
-      - name: Trigger Coolify deploy
+      - name: Update image digest in Coolify and deploy
         if: ${{ vars.COOLIFY_DEPLOY_ENABLED == 'true' }}
         env:
-          WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          SERVICE_UUID: ${{ secrets.COOLIFY_SERVICE_UUID }}
+          DIGEST: ${{ steps.docker_build.outputs.digest }}
         run: |
-          curl -fsS -X GET "$WEBHOOK_URL" -H "Authorization: Bearer $API_TOKEN"
+          # Coolify не робить pull для :latest на redeploy — пришпилюємо новий
+          # digest у compose через API і деплоїмо. Атомарно і детерміновано.
+          curl -fsS -H "Authorization: Bearer $API_TOKEN" \
+            "$COOLIFY_URL/api/v1/services/$SERVICE_UUID" -o service.json
+          python3 - <<'EOF'
+          import base64, json, re
+          svc = json.load(open('service.json'))
+          compose = svc['docker_compose_raw']
+          digest = __import__('os').environ['DIGEST']
+          compose = re.sub(
+              r'image: ghcr\.io/lyosu/telegram-bot-api[@:][^\s]+',
+              f'image: ghcr.io/lyosu/telegram-bot-api@{digest}',
+              compose)
+          json.dump({'docker_compose_raw': base64.b64encode(compose.encode()).decode()},
+                    open('patch.json', 'w'))
+          EOF
+          curl -fsS -X PATCH -H "Authorization: Bearer $API_TOKEN" \
+            -H 'Content-Type: application/json' --data @patch.json \
+            "$COOLIFY_URL/api/v1/services/$SERVICE_UUID" -o /dev/null
+          curl -fsS -H "Authorization: Bearer $API_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID" -o /dev/null
+          echo "Deployed $DIGEST"
