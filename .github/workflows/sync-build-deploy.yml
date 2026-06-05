@@ -108,9 +108,10 @@ jobs:
           svc = json.load(open('service.json'))
           compose = svc['docker_compose_raw']
           digest = __import__('os').environ['DIGEST']
+          # Coolify normalizes the YAML and may quote the image value — match both.
           compose = re.sub(
-              r'image: ghcr\.io/lyosu/telegram-bot-api[@:][^\s]+',
-              f'image: ghcr.io/lyosu/telegram-bot-api@{digest}',
+              r"image: '?ghcr\.io/lyosu/telegram-bot-api[@:][^\s']+'?",
+              f"image: 'ghcr.io/lyosu/telegram-bot-api@{digest}'",
               compose)
           json.dump({'docker_compose_raw': base64.b64encode(compose.encode()).decode()},
                     open('patch.json', 'w'))
