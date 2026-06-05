@@ -109,6 +109,7 @@ struct ClientParameters {
 
   bool local_mode_ = false;
   bool use_relative_paths_ = false;
+  bool stats_hide_sensible_data_ = false;
 
   td::vector<td::int64> allowed_bot_ids_;
 

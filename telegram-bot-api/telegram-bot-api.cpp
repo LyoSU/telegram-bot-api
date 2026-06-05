@@ -213,6 +213,9 @@ int main(int argc, char *argv[]) {
   options.add_option('\0', "relative",
                      "use relative file paths in local mode (paths are relative to the bot's working directory)",
                      [&] { parameters->use_relative_paths_ = true; });
+  options.add_option('\0', "stats-hide-sensible-data",
+                     "hide bot tokens and webhook URLs on the statistics page",
+                     [&] { parameters->stats_hide_sensible_data_ = true; });
   options.add_checked_option(
       '\0', "api-id",
       "application identifier for Telegram API access, which can be obtained at https://my.telegram.org (defaults to "
