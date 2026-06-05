@@ -240,6 +240,22 @@ int main(int argc, char *argv[]) {
                                token_range = {rem_i, mod_i};
                                return td::Status::OK();
                              });
+  options.add_checked_option(
+      '\0', "allowed-bot-ids",
+      "comma-separated list of bot internal identifiers (or full bot tokens; only the numeric prefix is used) "
+      "allowed to use the server. By default all bots are allowed",
+      [&](td::Slice ids) {
+        for (auto id_str : td::full_split(ids, ',')) {
+          id_str = td::trim(id_str);
+          auto colon_pos = id_str.find(':');
+          if (colon_pos != td::Slice::npos) {
+            id_str = id_str.substr(0, colon_pos);
+          }
+          TRY_RESULT(bot_id, td::to_integer_safe<td::int64>(id_str));
+          parameters->allowed_bot_ids_.push_back(bot_id);
+        }
+        return td::Status::OK();
+      });
   options.add_checked_option('\0', "max-webhook-connections",
                              "default value of the maximum webhook connections per bot",
                              td::OptionParser::parse_integer(parameters->default_max_webhook_connections_));

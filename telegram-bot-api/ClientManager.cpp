@@ -22,6 +22,7 @@
 
 #include "td/actor/MultiPromise.h"
 
+#include "td/utils/algorithm.h"
 #include "td/utils/common.h"
 #include "td/utils/format.h"
 #include "td/utils/logging.h"
@@ -77,6 +78,9 @@ void ClientManager::send(PromisedQueryPtr query) {
   }
   auto r_user_id = td::to_integer_safe<td::int64>(query->token().substr(0, token.find(':')));
   if (r_user_id.is_error() || !token_range_(r_user_id.ok())) {
+    return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
+  }
+  if (!parameters_->allowed_bot_ids_.empty() && !td::contains(parameters_->allowed_bot_ids_, r_user_id.ok())) {
     return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
   }
   auto user_id = r_user_id.ok();
