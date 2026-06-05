@@ -1,0 +1,96 @@
+name: Sync, build & deploy
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # щодня 04:17 UTC
+  workflow_dispatch:
+  push:
+    branches: [custom]
+    paths-ignore: ['FORK.md', 'README.md']
+
+concurrency:
+  group: sync-build-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  sync:
+    # тільки за кроном/вручну; пуш у custom одразу йде в build
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.rebase.outputs.updated }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom
+          fetch-depth: 0
+      - name: Rebase onto upstream
+        id: rebase
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream https://github.com/tdlib/telegram-bot-api.git
+          git fetch upstream master
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo 'No new upstream commits'
+            echo 'updated=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Конфлікт тут → крок падає → ран червоний → GitHub шле нотифікацію.
+          git rebase upstream/master
+          git push --force-with-lease origin custom
+          echo 'updated=true' >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [sync]
+    # запускається: після успішного sync з апдейтом; на ручний dispatch; на пуш у custom
+    if: >
+      !cancelled() && (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.sync.outputs.updated == 'true'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom          # свіжий стан після можливого force-push із sync
+          submodules: recursive
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y ninja-build gperf libssl-dev zlib1g-dev
+      - uses: hendrikmuhs/ccache-action@v1
+        with:
+          max-size: 2G
+      - name: Build
+        run: |
+          cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --target telegram-bot-api
+      - name: Extract version
+        id: ver
+        run: |
+          VER=$(grep -oP 'project\(TelegramBotApi VERSION \K[0-9.]+' CMakeLists.txt)
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/lyosu/telegram-bot-api:latest
+            ghcr.io/lyosu/telegram-bot-api:${{ steps.ver.outputs.version }}
+      - name: Trigger Coolify deploy
+        if: ${{ vars.COOLIFY_DEPLOY_ENABLED == 'true' }}
+        env:
+          WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+        run: |
+          curl -fsS -X GET "$WEBHOOK_URL" -H "Authorization: Bearer $API_TOKEN"
