@@ -91,6 +91,7 @@ class Client final : public WebhookActor::Callback {
   class JsonDatedFiles;
   class JsonUser;
   class JsonUsers;
+  class JsonUserInfo;
   class JsonReactionType;
   class JsonReactionCount;
   class JsonAcceptedGiftTypes;
@@ -789,6 +790,7 @@ class Client final : public WebhookActor::Callback {
 
   td::Status process_get_me_query(PromisedQueryPtr &query);
   td::Status process_get_messages_query(PromisedQueryPtr &query);
+  td::Status process_get_user_info_query(PromisedQueryPtr &query);
   td::Status process_get_my_commands_query(PromisedQueryPtr &query);
   td::Status process_set_my_commands_query(PromisedQueryPtr &query);
   td::Status process_delete_my_commands_query(PromisedQueryPtr &query);

@@ -216,6 +216,7 @@ bool Client::is_special_error_code(int32 error_code) {
 bool Client::init_methods() {
   methods_.emplace("getme", &Client::process_get_me_query);
   methods_.emplace("getmessages", &Client::process_get_messages_query);
+  methods_.emplace("getuserinfo", &Client::process_get_user_info_query);
   methods_.emplace("getmycommands", &Client::process_get_my_commands_query);
   methods_.emplace("setmycommands", &Client::process_set_my_commands_query);
   methods_.emplace("deletemycommands", &Client::process_delete_my_commands_query);
@@ -521,6 +522,40 @@ class Client::JsonUsers final : public td::Jsonable {
 
  private:
   const td::vector<int64> &user_ids_;
+  const Client *client_;
+};
+
+class Client::JsonUserInfo final : public td::Jsonable {
+ public:
+  JsonUserInfo(int64 user_id, const Client *client) : user_id_(user_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    auto user_info = client_->get_user_info(user_id_);
+    object("id", user_id_);
+    bool is_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
+    object("is_bot", td::JsonBool(is_bot));
+    object("first_name", user_info == nullptr ? "" : user_info->first_name);
+    if (user_info != nullptr && !user_info->last_name.empty()) {
+      object("last_name", user_info->last_name);
+    }
+    if (user_info != nullptr && !user_info->active_usernames.empty()) {
+      object("username", user_info->active_usernames[0]);
+    }
+    if (user_info != nullptr && !user_info->language_code.empty()) {
+      object("language_code", user_info->language_code);
+    }
+    if (user_info != nullptr && user_info->is_premium) {
+      object("is_premium", td::JsonTrue());
+    }
+    const ChatInfo *chat_info = client_->get_chat(user_id_);
+    if (chat_info != nullptr && chat_info->emoji_status_custom_emoji_id != 0) {
+      object("emoji_status_custom_emoji_id", td::to_string(chat_info->emoji_status_custom_emoji_id));
+    }
+  }
+
+ private:
+  int64 user_id_;
   const Client *client_;
 };
 
@@ -13389,6 +13424,14 @@ td::Status Client::process_get_messages_query(PromisedQueryPtr &query) {
         }
         answer_query(JsonMessages(messages), std::move(query));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_user_info_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+    answer_query(JsonUserInfo(user_id, this), std::move(query));
+  });
   return td::Status::OK();
 }
 
