@@ -215,6 +215,7 @@ bool Client::is_special_error_code(int32 error_code) {
 
 bool Client::init_methods() {
   methods_.emplace("getme", &Client::process_get_me_query);
+  methods_.emplace("getmessages", &Client::process_get_messages_query);
   methods_.emplace("getmycommands", &Client::process_get_my_commands_query);
   methods_.emplace("setmycommands", &Client::process_set_my_commands_query);
   methods_.emplace("deletemycommands", &Client::process_delete_my_commands_query);
@@ -13368,6 +13369,26 @@ void Client::on_cmd(PromisedQueryPtr query, bool force) {
 
 td::Status Client::process_get_me_query(PromisedQueryPtr &query) {
   answer_query(JsonUser(my_id_, this, true), std::move(query));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_messages_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(message_ids, get_message_ids(query.get(), 50));
+  if (message_ids.empty()) {
+    return td::Status::Error(400, "Message identifiers are not specified");
+  }
+  check_messages(
+      chat_id, std::move(message_ids), true, AccessRights::Read, "message to get", std::move(query),
+      [this](int64 chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) {
+        td::vector<td::string> messages;
+        for (auto message_id : message_ids) {
+          const MessageInfo *message_info = get_message(chat_id, message_id, true);
+          CHECK(message_info != nullptr);
+          messages.push_back(td::json_encode<td::string>(JsonMessage(message_info, true, "get messages", this)));
+        }
+        answer_query(JsonMessages(messages), std::move(query));
+      });
   return td::Status::OK();
 }
 
