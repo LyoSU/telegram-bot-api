@@ -1,5 +1,7 @@
 # Telegram Bot API
 
+> This is a fork of [tdlib/telegram-bot-api](https://github.com/tdlib/telegram-bot-api) with a few extra methods and options, automatically rebased on upstream daily. See [FORK.md](FORK.md) for the delta.
+
 The Telegram Bot API provides an HTTP API for creating [Telegram Bots](https://core.telegram.org/bots).
 
 If you've got any questions about bots or would like to report an issue with your bot, kindly contact us at [@BotSupport](https://t.me/BotSupport) in Telegram.
