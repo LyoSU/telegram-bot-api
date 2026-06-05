@@ -210,6 +210,9 @@ int main(int argc, char *argv[]) {
   options.add_option('\0', "version", "display version number and exit", [&] { need_print_version = true; });
   options.add_option('\0', "local", "allow the Bot API server to serve local requests",
                      [&] { parameters->local_mode_ = true; });
+  options.add_option('\0', "relative",
+                     "use relative file paths in local mode (paths are relative to the bot's working directory)",
+                     [&] { parameters->use_relative_paths_ = true; });
   options.add_checked_option(
       '\0', "api-id",
       "application identifier for Telegram API access, which can be obtained at https://my.telegram.org (defaults to "
