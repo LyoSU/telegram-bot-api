@@ -110,6 +110,8 @@ struct ClientParameters {
 
   bool local_mode_ = false;
 
+  td::vector<td::int64> allowed_bot_ids_;
+
   td::int32 api_id_ = 0;
   td::string api_hash_;
 
