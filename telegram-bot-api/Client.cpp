@@ -16738,7 +16738,12 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
   }
   if (with_path && file->local_->is_downloading_completed_) {
     if (parameters_->local_mode_) {
-      if (td::check_utf8(file->local_->path_)) {
+      if (parameters_->use_relative_paths_) {
+        td::Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
+        if (!relative_path.empty()) {
+          object("file_path", relative_path);
+        }
+      } else if (td::check_utf8(file->local_->path_)) {
         object("file_path", file->local_->path_);
       } else {
         object("file_path", td::JsonRawString(file->local_->path_));

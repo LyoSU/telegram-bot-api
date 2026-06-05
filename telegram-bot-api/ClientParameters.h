@@ -108,6 +108,7 @@ struct ClientParameters {
   bool allow_colon_in_filenames_ = true;
 
   bool local_mode_ = false;
+  bool use_relative_paths_ = false;
 
   td::vector<td::int64> allowed_bot_ids_;
 
