@@ -1,2 +1,3 @@
 *
 !binaries/
+!docker-entrypoint.sh
