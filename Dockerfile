@@ -8,9 +8,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data && chown 10000:10000 /data
 COPY binaries/${TARGETARCH}/telegram-bot-api /usr/local/bin/telegram-bot-api
-USER 10000:10000
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Starts as root only to chown the data volume, then drops to uid 10000
+# via setpriv (see docker-entrypoint.sh).
 WORKDIR /data
 EXPOSE 8081 8082
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
   CMD curl -fsS http://127.0.0.1:8082/ >/dev/null || exit 1
-ENTRYPOINT ["/usr/local/bin/telegram-bot-api"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
