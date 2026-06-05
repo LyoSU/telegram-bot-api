@@ -273,7 +273,9 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     sb << '\n';
     sb << "id\t" << bot_info.id_ << '\n';
     sb << "uptime\t" << now - bot_info.start_time_ << '\n';
-    sb << "token\t" << bot_info.token_ << '\n';
+    if (!parameters_->stats_hide_sensible_data_) {
+      sb << "token\t" << bot_info.token_ << '\n';
+    }
     sb << "username\t" << bot_info.username_ << '\n';
     if (active_request_count != 0) {
       sb << "active_request_count\t" << active_request_count << '\n';
@@ -285,7 +287,9 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
       sb << "active_file_upload_count\t" << active_file_upload_count << '\n';
     }
     if (!bot_info.webhook_.empty()) {
-      sb << "webhook\t" << bot_info.webhook_ << '\n';
+      if (!parameters_->stats_hide_sensible_data_) {
+        sb << "webhook\t" << bot_info.webhook_ << '\n';
+      }
       if (bot_info.has_webhook_certificate_) {
         sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << '\n';
       }
