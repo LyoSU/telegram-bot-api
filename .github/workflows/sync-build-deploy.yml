@@ -69,7 +69,6 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
-            -DMEMPROF=FAST \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target telegram-bot-api
           mkdir -p binaries/amd64 && cp build/telegram-bot-api binaries/amd64/
