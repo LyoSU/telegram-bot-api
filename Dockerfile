@@ -13,7 +13,10 @@ RUN apt-get update \
 # under TDLib's small-allocation churn) and speeds up allocation at high RPS.
 ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
 # Return freed pages to the OS within ~30s instead of hoarding them.
-ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:30000,muzzy_decay_ms:30000
+# NB: no background_thread:true — preloaded jemalloc spawning a thread during
+# early init SIGSEGVs this binary (verified empirically); decay alone is enough
+# since allocations are constant at high RPS.
+ENV MALLOC_CONF=dirty_decay_ms:30000,muzzy_decay_ms:30000
 # Fallback if jemalloc is ever removed: cap glibc malloc arenas.
 ENV MALLOC_ARENA_MAX=2
 COPY binaries/${TARGETARCH}/telegram-bot-api /usr/local/bin/telegram-bot-api
