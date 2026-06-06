@@ -6,6 +6,19 @@ This fork adds a few read-only methods and hardening options on top of
 delta is always visible as `git diff upstream/master..custom`. Licensed under
 the same Boost Software License 1.0 as upstream.
 
+## Secret-leak guard
+
+A `pre-commit` hook in `.githooks/` blocks commits that contain Telegram bot
+tokens, bearer/API secrets, or files under `data/` (the local server stores
+each bot's files in a directory named after its full token, so a stray path
+leaks one). Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Bypass a confirmed false positive with `git commit --no-verify`.
+
 ## Added methods
 
 ### getMessages
