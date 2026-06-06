@@ -77,6 +77,7 @@ class ServerBotInfo {
   td::int32 tail_update_id_ = 0;
   td::int32 webhook_max_connections_ = 0;
   std::size_t pending_update_count_ = 0;
+  td::int64 dropped_update_count_ = 0;
   double start_time_ = 0;
 };
 

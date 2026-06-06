@@ -119,6 +119,7 @@ struct ClientParameters {
   td::string version_;
 
   td::int32 default_max_webhook_connections_ = 0;
+  td::int32 max_pending_updates_ = 0;  // 0 = unlimited, as in upstream
   td::IPAddress webhook_proxy_ip_address_;
 
   double start_time_ = 0;

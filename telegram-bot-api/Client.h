@@ -1499,6 +1499,7 @@ class Client final : public WebhookActor::Callback {
   td::string bot_token_id_;
   bool is_test_dc_;
   int64 tqueue_id_;
+  int64 dropped_update_count_ = 0;
   double start_time_ = 0;
 
   int64 my_id_ = -1;

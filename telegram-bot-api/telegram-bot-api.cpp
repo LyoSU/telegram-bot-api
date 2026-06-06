@@ -265,6 +265,10 @@ int main(int argc, char *argv[]) {
   options.add_checked_option('\0', "max-webhook-connections",
                              "default value of the maximum webhook connections per bot",
                              td::OptionParser::parse_integer(parameters->default_max_webhook_connections_));
+  options.add_checked_option('\0', "max-pending-updates",
+                             "drop the oldest pending updates of a bot when their number exceeds the specified limit; "
+                             "disabled by default",
+                             td::OptionParser::parse_integer(parameters->max_pending_updates_));
   options.add_checked_option('\0', "http-ip-address",
                              "local IP address, HTTP connections to which will be accepted. By default, connections to "
                              "any local IPv4 address are accepted",
@@ -335,6 +339,12 @@ int main(int argc, char *argv[]) {
   options.add_check([&] {
     if (memory_verbosity_level < 0) {
       return td::Status::Error("Wrong memory verbosity level specified");
+    }
+    return td::Status::OK();
+  });
+  options.add_check([&] {
+    if (parameters->max_pending_updates_ < 0) {
+      return td::Status::Error("Wrong max pending updates count specified");
     }
     return td::Status::OK();
   });

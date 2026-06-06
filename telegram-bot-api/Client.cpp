@@ -8508,6 +8508,7 @@ ServerBotInfo Client::get_bot_info() const {
   res.tail_update_id_ = tqueue->get_tail(tqueue_id_).value();
   res.webhook_max_connections_ = webhook_max_connections_;
   res.pending_update_count_ = tqueue->get_size(tqueue_id_);
+  res.dropped_update_count_ = dropped_update_count_;
   res.start_time_ = start_time_;
   return res;
 }
@@ -17801,6 +17802,19 @@ void Client::add_update_impl(UpdateType update_type, const td::VirtuallyJsonable
       long_poll_wakeup(false);
     } else {
       send_closure(webhook_id_, &WebhookActor::update);
+    }
+    if (parameters_->max_pending_updates_ > 0) {
+      auto max_count = static_cast<std::size_t>(parameters_->max_pending_updates_);
+      auto &tqueue = parameters_->shared_data_->tqueue_;
+      if (tqueue->get_size(tqueue_id_) > max_count) {
+        // drop in ~10% chunks to amortize the O(keep_count) cost of clear()
+        auto keep_count = max_count - max_count / 10;
+        auto deleted_events = tqueue->clear(tqueue_id_, keep_count);
+        dropped_update_count_ += static_cast<int64>(deleted_events.size());
+        LOG(WARNING) << "Dropped " << deleted_events.size() << " oldest pending updates; " << dropped_update_count_
+                     << " dropped in total";
+        td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), deleted_events);
+      }
     }
   } else {
     LOG(DEBUG) << "Update failed to be added with error " << r_id.error() << " for " << timeout
