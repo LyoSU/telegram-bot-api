@@ -101,8 +101,19 @@ jobs:
         run: |
           # Coolify не робить pull для :latest на redeploy — пришпилюємо новий
           # digest у compose через API і деплоїмо. Атомарно і детерміновано.
-          curl -fsS -H "Authorization: Bearer $API_TOKEN" \
-            "$COOLIFY_URL/api/v1/services/$SERVICE_UUID" -o service.json
+          # -f ховає тіло відповіді, тому статус перевіряємо самі і при помилці
+          # друкуємо, що саме відповів Coolify (403 = права токена або IP-allowlist).
+          api() {
+            local out="$1"; shift
+            local code
+            code=$(curl -sS -H "Authorization: Bearer $API_TOKEN" -o "$out" -w '%{http_code}' "$@")
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              echo "::error::Coolify API returned HTTP $code for $* :"
+              cat "$out"; echo
+              exit 1
+            fi
+          }
+          api service.json "$COOLIFY_URL/api/v1/services/$SERVICE_UUID"
           python3 - <<'EOF'
           import base64, json, re
           svc = json.load(open('service.json'))
@@ -116,9 +127,7 @@ jobs:
           json.dump({'docker_compose_raw': base64.b64encode(compose.encode()).decode()},
                     open('patch.json', 'w'))
           EOF
-          curl -fsS -X PATCH -H "Authorization: Bearer $API_TOKEN" \
-            -H 'Content-Type: application/json' --data @patch.json \
-            "$COOLIFY_URL/api/v1/services/$SERVICE_UUID" -o /dev/null
-          curl -fsS -H "Authorization: Bearer $API_TOKEN" \
-            "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID" -o /dev/null
+          api /dev/null -X PATCH -H 'Content-Type: application/json' \
+            --data @patch.json "$COOLIFY_URL/api/v1/services/$SERVICE_UUID"
+          api /dev/null "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID"
           echo "Deployed $DIGEST"
