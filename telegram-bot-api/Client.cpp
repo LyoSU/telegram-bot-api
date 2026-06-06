@@ -9347,6 +9347,15 @@ void Client::on_update_authorization_state() {
         send_request(make_object<td_api::setOption>(option, make_object<td_api::optionValueBoolean>(true)),
                      td::make_unique<TdOnOkCallback>());
       }
+      // Bots default to a 30-minute per-dialog message retention
+      // (DIALOG_UNLOAD_BOT_DELAY). Under high RPS on busy channels this keeps
+      // every delivered message in RAM for half an hour — memprof attributed
+      // the bulk of RSS to MessagesManager::Message. We deliver each update
+      // immediately (and resolve replies at build time / via getMessages on
+      // demand), so a short retention is safe and bounds the cache.
+      send_request(make_object<td_api::setOption>("message_unload_delay",
+                                                  make_object<td_api::optionValueInteger>(60)),
+                   td::make_unique<TdOnOkCallback>());
 
       auto request = make_object<td_api::setTdlibParameters>();
       request->use_test_dc_ = is_test_dc_;
