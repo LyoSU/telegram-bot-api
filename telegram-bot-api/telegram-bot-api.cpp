@@ -203,6 +203,12 @@ int main(int argc, char *argv[]) {
     }
     return td::string();
   }(std::getenv("TELEGRAM_API_HASH"));
+  parameters->max_pending_updates_ = [](auto x) -> td::int32 {
+    if (x) {
+      return td::to_integer<td::int32>(td::Slice(x));
+    }
+    return 0;
+  }(std::getenv("TELEGRAM_MAX_PENDING_UPDATES"));
 
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
@@ -266,7 +272,8 @@ int main(int argc, char *argv[]) {
                              "default value of the maximum webhook connections per bot",
                              td::OptionParser::parse_integer(parameters->default_max_webhook_connections_));
   options.add_checked_option('\0', "max-pending-updates",
-                             "drop the oldest pending updates of a bot when their number exceeds the specified limit; "
+                             "drop the oldest pending updates of a bot when their number exceeds the specified limit "
+                             "(defaults to the value of the TELEGRAM_MAX_PENDING_UPDATES environment variable); "
                              "disabled by default",
                              td::OptionParser::parse_integer(parameters->max_pending_updates_));
   options.add_checked_option('\0', "http-ip-address",
