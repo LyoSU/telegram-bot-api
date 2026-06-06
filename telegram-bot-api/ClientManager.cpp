@@ -302,6 +302,9 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
       sb << "tail_update_id\t" << bot_info.tail_update_id_ << '\n';
       sb << "pending_update_count\t" << bot_info.pending_update_count_ << '\n';
     }
+    if (bot_info.dropped_update_count_ != 0) {
+      sb << "dropped_update_count\t" << bot_info.dropped_update_count_ << '\n';
+    }
 
     auto stats = client_info->stat_.as_vector(now);
     for (auto &stat : stats) {
