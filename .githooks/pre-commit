@@ -1,0 +1,43 @@
+#!/bin/sh
+# Blocks commits that would leak secrets or local server state.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass a single commit (use sparingly):  git commit --no-verify
+
+fail=0
+
+# 1. Telegram bot tokens: "<6-10 digit id>:<35-char secret>". The local Bot API
+#    server stores each bot's files under a directory named after its full token,
+#    so a stray data/ path is enough to leak one (this is how it happened once).
+if git diff --cached --name-only -z | tr '\0' '\n' \
+     | grep -nE '[0-9]{6,10}:[A-Za-z0-9_-]{35}' >/dev/null; then
+  echo "✖ pre-commit: a staged file PATH looks like a Telegram bot token." >&2
+  git diff --cached --name-only -z | tr '\0' '\n' | grep -nE '[0-9]{6,10}:[A-Za-z0-9_-]{35}' >&2
+  fail=1
+fi
+
+# Same pattern inside the staged content (added lines only).
+if git diff --cached -U0 | grep -E '^\+' \
+     | grep -nE '[0-9]{6,10}:[A-Za-z0-9_-]{35}' >/dev/null; then
+  echo "✖ pre-commit: staged CONTENT contains a Telegram-bot-token-like string." >&2
+  fail=1
+fi
+
+# 2. Anything under data/ — local Bot API working dir, never belongs in git.
+if git diff --cached --name-only | grep -E '(^|/)data/' >/dev/null; then
+  echo "✖ pre-commit: refusing to commit files under data/ (local server state)." >&2
+  git diff --cached --name-only | grep -E '(^|/)data/' >&2
+  fail=1
+fi
+
+# 3. Coolify / generic bearer tokens accidentally pasted into tracked files.
+if git diff --cached -U0 | grep -E '^\+' \
+     | grep -niE '(api[_-]?token|bearer|secret)["'\'' :=]+[A-Za-z0-9_-]{24,}' >/dev/null; then
+  echo "✖ pre-commit: staged content looks like an API token / bearer secret." >&2
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "Commit blocked. Remove the secret, or bypass with --no-verify if it's a false positive." >&2
+  exit 1
+fi
