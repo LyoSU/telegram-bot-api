@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
   td::string http_ip_address = "0.0.0.0";
   td::string http_stat_ip_address = "0.0.0.0";
   td::string log_file_path;
-  int default_verbosity_level = 0;
+  int default_verbosity_level = 2;  // [DIAG] щоб memprof-дамп (LOG(WARNING)) потрапляв у docker logs
   int memory_verbosity_level = VERBOSITY_NAME(INFO);
   td::int64 log_max_file_size = 2000000000;
   td::string working_directory = PSTRING() << "." << TD_DIR_SLASH;

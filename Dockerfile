@@ -11,7 +11,8 @@ RUN apt-get update \
     && ln -s "/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2" /usr/local/lib/libjemalloc.so.2
 # jemalloc cuts telegram-bot-api RSS substantially (glibc malloc fragments badly
 # under TDLib's small-allocation churn) and speeds up allocation at high RPS.
-ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
+# [DIAG] LD_PRELOAD вимкнено: memprof перехоплює malloc сам, jemalloc конфліктує
+# ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
 # Return freed pages to the OS within ~30s instead of hoarding them.
 # NB: no background_thread:true — preloaded jemalloc spawning a thread during
 # early init SIGSEGVs this binary (verified empirically); decay alone is enough
