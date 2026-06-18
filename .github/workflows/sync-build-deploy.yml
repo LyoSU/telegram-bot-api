@@ -54,7 +54,15 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         needs.sync.outputs.updated == 'true'
       )
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm   # безплатний нативний ARM-раннер для публічних репо
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,14 +72,53 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ninja-build gperf libssl-dev zlib1g-dev
       - uses: hendrikmuhs/ccache-action@v1
         with:
-          key: amd64
+          key: ${{ matrix.arch }}   # окремий ccache на кожну архітектуру
           max-size: 2G
       - name: Build
         run: |
           cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target telegram-bot-api
-          mkdir -p binaries/amd64 && cp build/telegram-bot-api binaries/amd64/
+          # Dockerfile копіює binaries/${TARGETARCH}/telegram-bot-api; TARGETARCH=amd64|arm64
+          mkdir -p binaries/${{ matrix.arch }} && cp build/telegram-bot-api binaries/${{ matrix.arch }}/
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          # Пушимо БЕЗ тегу, лише за digest — теги склеїть job merge у manifest list.
+          outputs: type=image,name=ghcr.io/lyosu/telegram-bot-api,push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          echo "${{ steps.build.outputs.digest }}" > /tmp/digests/${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/${{ matrix.arch }}
+          retention-days: 1
+          if-no-files-found: error
+
+  merge:
+    needs: [build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
       - name: Extract version
         id: ver
         run: |
@@ -82,15 +129,23 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Create multi-arch manifest list
         id: docker_build
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ghcr.io/lyosu/telegram-bot-api:latest
-            ghcr.io/lyosu/telegram-bot-api:${{ steps.ver.outputs.version }}
+        run: |
+          IMAGE=ghcr.io/lyosu/telegram-bot-api
+          # Зліплюємо per-arch digest-и (amd64 + arm64) в один тег із manifest list.
+          REFS=""
+          for f in /tmp/digests/*; do
+            REFS="$REFS ${IMAGE}@$(cat "$f")"
+          done
+          docker buildx imagetools create \
+            -t "${IMAGE}:latest" \
+            -t "${IMAGE}:${{ steps.ver.outputs.version }}" \
+            $REFS
+          # Digest самого manifest list — його пришпилюємо в Coolify.
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:latest" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
       - name: Update image digest in Coolify and deploy
         if: ${{ vars.COOLIFY_DEPLOY_ENABLED == 'true' }}
         env:
