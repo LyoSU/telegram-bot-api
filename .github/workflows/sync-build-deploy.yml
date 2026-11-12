@@ -15,6 +15,7 @@ concurrency:
 permissions:
   contents: write
   packages: write
+  actions: write   # keepalive: re-enable цього workflow (див. крок Keepalive)
 
 jobs:
   sync:
@@ -24,6 +25,14 @@ jobs:
     outputs:
       updated: ${{ steps.rebase.outputs.updated }}
     steps:
+      # GitHub вимикає scheduled workflow після 60 днів без активності в репо
+      # (так автоапдейт мовчки став 2026-10-27). Виклик enable скидає цей
+      # таймер — без фейкових комітів, які б запускали зайву збірку.
+      - name: Keepalive
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/sync-build-deploy.yml/enable"
       - uses: actions/checkout@v4
         with:
           ref: custom
