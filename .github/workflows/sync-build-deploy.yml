@@ -193,5 +193,15 @@ jobs:
           EOF
           api /dev/null -X PATCH -H 'Content-Type: application/json' \
             --data @patch.json "$COOLIFY_URL/api/v1/services/$SERVICE_UUID"
-          api /dev/null "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID"
+          # Новіші версії Coolify приймають deploy лише POST-ом (GET → 405, через
+          # це 2026-11-12 digest оновився, а сервіс не перезапустився); старіші —
+          # лише GET. Пробуємо POST і відкочуємось на GET тільки при 405.
+          code=$(curl -sS -H "Authorization: Bearer $API_TOKEN" -o deploy.json -w '%{http_code}' \
+            -X POST "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID")
+          if [ "$code" = 405 ]; then
+            api deploy.json "$COOLIFY_URL/api/v1/deploy?uuid=$SERVICE_UUID"
+          elif [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Coolify deploy returned HTTP $code:"; cat deploy.json; echo
+            exit 1
+          fi
           echo "Deployed $DIGEST"
